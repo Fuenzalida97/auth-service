@@ -3,12 +3,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
-import { User } from './users/entities/user.entity';
+import { Users } from './users/entities/users.entity';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    TypeOrmModule.forFeature([User]),
+    TypeOrmModule.forFeature([Users]),
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: 'localhost',
@@ -16,7 +16,7 @@ import { User } from './users/entities/user.entity';
       username: 'postgres',
       password: 'admin',
       database: 'auth_service',
-      entities: [User],
+      entities: [Users],
       synchronize: true, // Solo en desarrollo
     }),
     AuthModule,
