@@ -2,22 +2,25 @@ import {
   Injectable,
   ConflictException,
   UnauthorizedException,
-  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Users } from '../users/entities/users.entity';
+import { User } from '../users/entities/users.entity';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import * as bcrypt from 'bcrypt';
+import { LoginUserDto } from './dto/login-user.dto';
+import { JwtService } from '@nestjs/jwt';
+import { Role } from '../users/enums/user-role.enum';
 
 @Injectable()
 export class AuthService {
   constructor(
-    @InjectRepository(Users)
-    private readonly userRepository: Repository<Users>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    private readonly jwtService: JwtService,
   ) {}
 
-  async register(dto: CreateUserDto): Promise<Omit<Users, 'password'>> {
+  async register(dto: CreateUserDto): Promise<Omit<User, 'password'>> {
     const userExists = await this.userRepository.findOne({
       where: { email: dto.email },
     });
@@ -31,6 +34,7 @@ export class AuthService {
     const newUser = this.userRepository.create({
       ...dto,
       password: hashedPassword,
+      role: Role.USER,
     });
 
     const savedUser = await this.userRepository.save(newUser);
@@ -39,25 +43,25 @@ export class AuthService {
     return result;
   }
 
-  async login(
-    email: string,
-    password: string,
-  ): Promise<Omit<Users, 'password'>> {
-    const user = await this.userRepository.findOne({
-      where: { email },
-    });
+  async login(dto: LoginUserDto) {
+    const user = await this.userRepository.findOneBy({ email: dto.email });
+    if (!user) throw new UnauthorizedException('Credenciales inválidas');
 
-    if (!user) {
-      throw new NotFoundException('Usuario no encontrado.');
-    }
+    const passwordMatch = await bcrypt.compare(dto.password, user.password);
+    if (!passwordMatch)
+      throw new UnauthorizedException('Credenciales inválidas');
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    const payload = { sub: user.id, email: user.email };
 
-    if (!isPasswordValid) {
-      throw new UnauthorizedException('Contraseña incorrecta.');
-    }
+    const token = this.jwtService.sign(payload);
 
-    const { password: _, ...result } = user;
-    return result;
+    return {
+      access_token: token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+      },
+    };
   }
 }
