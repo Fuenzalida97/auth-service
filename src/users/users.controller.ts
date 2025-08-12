@@ -2,52 +2,51 @@ import {
   Controller,
   Get,
   Post,
-  Put,
-  Delete,
-  Param,
   Body,
+  Patch,
+  Param,
+  Delete,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { FilterUserDto } from './dto/filter-user.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/guards/roles.decorator';
 import { Role } from './enums/user-role.enum';
 
 @Controller('users')
-@UseGuards(JwtAuthGuard, RolesGuard) // Aplica guard de JWT y Roles a todo el controller
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  // Solo administradores pueden listar todos los usuarios
-  @Get()
+  @Post()
   @Roles(Role.ADMIN)
-  findAll() {
-    return this.usersService.findAll();
+  create(@Body() createUserDto: CreateUserDto) {
+    return this.usersService.create(createUserDto);
   }
 
-  // Solo administradores pueden ver un usuario específico
+  @Get()
+  @Roles(Role.ADMIN)
+  findAll(@Query() filterDto: FilterUserDto) {
+    return this.usersService.findAll(filterDto);
+  }
+
   @Get(':id')
   @Roles(Role.ADMIN)
   findOne(@Param('id') id: string) {
     return this.usersService.findOne(id);
   }
 
-  // Cualquier usuario autenticado puede crear usuarios (incluyendo admins)
-  @Post()
+  @Patch(':id')
   @Roles(Role.ADMIN)
-  create(@Body() body: any) {
-    return this.usersService.create(body);
+  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
+    return this.usersService.update(id, updateUserDto);
   }
 
-  // Solo administradores pueden actualizar usuarios
-  @Put(':id')
-  @Roles(Role.ADMIN)
-  update(@Param('id') id: string, @Body() body: any) {
-    return this.usersService.update(id, body);
-  }
-
-  // Solo administradores pueden borrar usuarios
   @Delete(':id')
   @Roles(Role.ADMIN)
   remove(@Param('id') id: string) {

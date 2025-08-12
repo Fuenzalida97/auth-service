@@ -1,52 +1,88 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, ILike } from 'typeorm';
 import { User } from './entities/users.entity';
-import { Role } from './enums/user-role.enum';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { FilterUserDto } from './dto/filter-user.dto';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User)
-    private usersRepository: Repository<User>,
+    private readonly userRepository: Repository<User>,
   ) {}
 
-  async findAll(): Promise<User[]> {
-    return this.usersRepository.find();
+  async create(createUserDto: CreateUserDto): Promise<User> {
+    const userExists = await this.userRepository.findOne({
+      where: { email: createUserDto.email },
+    });
+
+    if (userExists) {
+      throw new ConflictException('El correo ya está registrado.');
+    }
+    const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
+    const user = this.userRepository.create({
+      ...createUserDto,
+      password: hashedPassword,
+    });
+    return this.userRepository.save(user);
+  }
+
+  async findAll(filterDto: FilterUserDto) {
+    const { page = 1, limit = 20, role, search } = filterDto;
+
+    const where: any = {};
+    if (role) where.role = role;
+    if (search) {
+      where.name = ILike(`%${search}%`);
+      where.email = ILike(`%${search}%`);
+    }
+
+    const [data, total] = await this.userRepository.findAndCount({
+      where,
+      skip: (Number(page) - 1) * Number(limit),
+      take: Number(limit),
+      order: { createdAt: 'DESC' },
+    });
+
+    return {
+      data,
+      total,
+      page: Number(page),
+      limit: Number(limit),
+      totalPages: Math.ceil(total / Number(limit)),
+    };
   }
 
   async findOne(id: string): Promise<User> {
-    const user = await this.usersRepository.findOne({ where: { id } });
-    if (!user)
-      throw new NotFoundException(`Usuario con ID ${id} no encontrado`);
+    const user = await this.userRepository.findOne({ where: { id } });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
     return user;
   }
 
-  async create(data: Partial<User>): Promise<User> {
-    const hashedPassword = await bcrypt.hash(data.password, 10);
-    const newUser = this.usersRepository.create({
-      ...data,
-      password: hashedPassword,
-    });
-    return this.usersRepository.save(newUser);
-  }
-
-  async update(id: string, data: Partial<User>): Promise<User> {
+  async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
     const user = await this.findOne(id);
 
-    if (data.password) {
-      data.password = await bcrypt.hash(data.password, 10);
+    if (updateUserDto.password) {
+      updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
     }
 
-    Object.assign(user, data);
-    return this.usersRepository.save(user);
+    Object.assign(user, updateUserDto);
+    return this.userRepository.save(user);
   }
 
   async remove(id: string): Promise<void> {
-    const result = await this.usersRepository.delete(id);
-    if (result.affected === 0) {
-      throw new NotFoundException(`Usuario con ID ${id} no encontrado`);
-    }
+    const user = await this.findOne(id);
+    await this.userRepository.remove(user);
+  }
+
+  async findByEmail(email: string): Promise<User | null> {
+    return this.userRepository.findOne({ where: { email } });
   }
 }
