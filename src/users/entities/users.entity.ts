@@ -16,7 +16,11 @@ export class User {
   @Column({ unique: true })
   email: string;
 
-  @Column({ nullable: true })
+  @Column({
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
   password: string | null; // null si es login con proveedor externo
 
   @Column({
@@ -27,6 +31,7 @@ export class User {
   provider: AuthProvider;
 
   @Column({
+    type: 'varchar',
     nullable: true,
     default: null,
   })

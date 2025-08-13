@@ -1,116 +1,113 @@
 import {
   Injectable,
   UnauthorizedException,
-  BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
-import { OAuth2Client } from 'google-auth-library';
 import { User } from '../users/entities/users.entity';
 import { AuthProvider } from '../users/enums/user-authprovider.enum';
+import { Role } from '../users/enums/user-role.enum';
 import { RegisterUserDto } from './dto/register-user.dto';
 import { LoginUserDto } from './dto/login-user.dto';
-import { Role } from 'src/users/enums/user-role.enum';
+
+type GoogleUserInput = {
+  email: string;
+  name: string;
+  provider: AuthProvider; // GOOGLE
+  providerId: string;
+  avatar?: string | null;
+};
 
 @Injectable()
 export class AuthService {
-  private googleClient: OAuth2Client;
-
   constructor(
     @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
-    private readonly jwtService: JwtService,
-  ) {
-    this.googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-  }
+    private readonly userRepo: Repository<User>,
+    private readonly jwt: JwtService,
+  ) {}
 
-  /** Registro normal (correo + contraseña) */
-  async register(registerDto: RegisterUserDto) {
-    const { email, password } = registerDto;
-
-    const existingUser = await this.userRepository.findOne({
-      where: { email },
-    });
-    if (existingUser) {
-      throw new BadRequestException('El email ya está registrado');
+  /** Registro normal (email + password) */
+  async register(dto: RegisterUserDto) {
+    const exists = await this.userRepo.findOne({ where: { email: dto.email } });
+    if (exists) {
+      throw new ConflictException('El correo ya está registrado');
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashed = await bcrypt.hash(dto.password, 10);
 
-    const newUser = this.userRepository.create({
-      email,
-      password: hashedPassword,
-      provider: AuthProvider.LOCAL,
+    const user = this.userRepo.create({
+      email: dto.email,
+      name: dto.name,
+      password: hashed,
       role: Role.USER,
+      provider: AuthProvider.LOCAL,
     });
 
-    await this.userRepository.save(newUser);
-    return { message: 'Usuario registrado con éxito' };
+    await this.userRepo.save(user);
+    return this.signFor(user);
   }
 
-  /** Login normal (correo + contraseña) */
-  async login(loginDto: LoginUserDto) {
-    const { email, password } = loginDto;
+  /** Login normal (email + password) */
+  async login(dto: LoginUserDto) {
+    const user = await this.userRepo.findOne({ where: { email: dto.email } });
+    if (!user) throw new UnauthorizedException('Credenciales inválidas');
 
-    const user = await this.userRepository.findOne({ where: { email } });
-    if (!user) {
-      throw new UnauthorizedException('Credenciales inválidas');
-    }
-
+    // Si el usuario es solo Google y no tiene password, no puede entrar por aquí
     if (user.provider !== AuthProvider.LOCAL || !user.password) {
       throw new UnauthorizedException('Debes iniciar sesión con Google');
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      throw new UnauthorizedException('Credenciales inválidas');
-    }
+    const ok = await bcrypt.compare(dto.password, user.password);
+    if (!ok) throw new UnauthorizedException('Credenciales inválidas');
 
-    const payload = { sub: user.id, email: user.email, role: user.role };
-    const accessToken = await this.jwtService.signAsync(payload);
-
-    return { accessToken };
+    return this.signFor(user);
   }
 
-  /** Login con Google */
-  async loginWithGoogle(idToken: string) {
-    const ticket = await this.googleClient.verifyIdToken({
-      idToken,
-      audience: process.env.GOOGLE_CLIENT_ID,
+  /** Login / alta con Google (vía GoogleAuthGuard) */
+  async googleLoginOrRegister(googleUser: GoogleUserInput) {
+    let user = await this.userRepo.findOne({
+      where: { email: googleUser.email },
     });
 
-    const payload = ticket.getPayload();
-    if (!payload || !payload.email) {
-      throw new UnauthorizedException('Token de Google inválido');
-    }
-
-    const googleId = payload.sub;
-    const email = payload.email;
-
-    let user = await this.userRepository.findOne({ where: { email } });
-
     if (user) {
-      // Si el usuario existe pero no tiene vinculado Google, lo vinculamos
+      // Si ya existía (LOCAL) pero aún no tenía providerId, lo vinculamos
       if (!user.providerId) {
-        user.providerId = googleId;
-        await this.userRepository.save(user);
+        user.providerId = googleUser.providerId;
+        await this.userRepo.save(user);
       }
-    } else {
-      // Si no existe, lo creamos como usuario LOCAL pero con providerId de Google
-      user = this.userRepository.create({
-        email,
-        provider: AuthProvider.LOCAL, // mantiene login normal disponible
-        providerId: googleId,
-        role: Role.USER,
-      });
-      await this.userRepository.save(user);
+      return this.signFor(user);
     }
 
-    const jwtPayload = { sub: user.id, email: user.email, role: user.role };
-    const accessToken = await this.jwtService.signAsync(jwtPayload);
+    // Si no existe, lo creamos como GOOGLE (password null)
+    user = this.userRepo.create({
+      email: googleUser.email,
+      name: googleUser.name,
+      role: Role.USER,
+      provider: AuthProvider.GOOGLE,
+      providerId: googleUser.providerId,
+      password: null,
+    });
 
-    return { accessToken };
+    await this.userRepo.save(user);
+    return this.signFor(user);
+  }
+
+  /** Helper: genera el JWT y devuelve datos útiles */
+  private async signFor(user: User) {
+    const payload = { sub: user.id, email: user.email, role: user.role };
+    const access_token = await this.jwt.signAsync(payload);
+    return {
+      access_token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        provider: user.provider,
+      },
+    };
   }
 }

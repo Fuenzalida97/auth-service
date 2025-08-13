@@ -4,17 +4,17 @@ import { Role } from '../enums/user-role.enum';
 export class FilterUserDto {
   @IsOptional()
   @IsNumberString()
-  page?: number; // Página actual
+  page?: number;
 
   @IsOptional()
   @IsNumberString()
-  limit?: number; // Límite de registros por página
+  limit?: number;
 
   @IsOptional()
   @IsEnum(Role)
-  role?: Role; // Filtrar por rol
+  role?: Role;
 
   @IsOptional()
   @IsString()
-  search?: string; // Buscar por nombre o email
+  search?: string;
 }

@@ -37,12 +37,12 @@ export class UsersService {
   async findAll(filterDto: FilterUserDto) {
     const { page = 1, limit = 20, role, search } = filterDto;
 
-    const where: any = {};
-    if (role) where.role = role;
-    if (search) {
-      where.name = ILike(`%${search}%`);
-      where.email = ILike(`%${search}%`);
-    }
+    const where = search
+      ? [
+          { ...(role ? { role } : {}), name: ILike(`%${search}%`) },
+          { ...(role ? { role } : {}), email: ILike(`%${search}%`) },
+        ]
+      : { ...(role ? { role } : {}) };
 
     const [data, total] = await this.userRepository.findAndCount({
       where,

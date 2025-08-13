@@ -34,16 +34,16 @@ export class GoogleAuthGuard implements CanActivate {
         throw new UnauthorizedException('Token de Google inválido');
       }
 
-      // Agregamos los datos validados al request para usarlos en el controller
       request.user = {
         email: payload.email,
-        name: payload.name || payload.given_name || '',
+        name: payload.name || payload.given_name || 'Usuario',
+        avatar: payload.picture || null,
         provider: AuthProvider.GOOGLE,
-        providerId: payload.sub, // ID único del usuario en Google
+        providerId: payload.sub,
       };
 
       return true;
-    } catch (error) {
+    } catch {
       throw new UnauthorizedException('Error validando token de Google');
     }
   }
