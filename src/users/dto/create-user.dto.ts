@@ -16,7 +16,7 @@ export class CreateUserDto {
   password: string;
 
   @IsEnum(Role)
-  role: Role; // Aquí el ADMIN podrá elegir entre USER o ADMIN
+  role: Role;
 
   @IsOptional()
   @IsString()

@@ -9,7 +9,7 @@ import { AuthProvider } from '../users/enums/user-authprovider.enum';
 type GoogleUserFromGuard = {
   email: string;
   name: string;
-  provider: AuthProvider; // vendrá como AuthProvider.GOOGLE
+  provider: AuthProvider;
   providerId: string;
   avatar?: string | null;
 };

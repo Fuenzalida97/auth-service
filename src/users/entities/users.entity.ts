@@ -21,7 +21,7 @@ export class User {
     length: 255,
     nullable: true,
   })
-  password: string | null; // null si es login con proveedor externo
+  password: string | null;
 
   @Column({
     type: 'enum',
@@ -35,7 +35,7 @@ export class User {
     nullable: true,
     default: null,
   })
-  providerId: string | null; // ID del usuario en el proveedor externo
+  providerId: string | null;
 
   @Column({
     type: 'enum',

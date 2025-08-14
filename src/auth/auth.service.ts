@@ -16,7 +16,7 @@ import { LoginUserDto } from './dto/login-user.dto';
 type GoogleUserInput = {
   email: string;
   name: string;
-  provider: AuthProvider; // GOOGLE
+  provider: AuthProvider;
   providerId: string;
   avatar?: string | null;
 };
@@ -29,7 +29,6 @@ export class AuthService {
     private readonly jwt: JwtService,
   ) {}
 
-  /** Registro normal (email + password) */
   async register(dto: RegisterUserDto) {
     const exists = await this.userRepo.findOne({ where: { email: dto.email } });
     if (exists) {
@@ -50,12 +49,10 @@ export class AuthService {
     return this.signFor(user);
   }
 
-  /** Login normal (email + password) */
   async login(dto: LoginUserDto) {
     const user = await this.userRepo.findOne({ where: { email: dto.email } });
     if (!user) throw new UnauthorizedException('Credenciales inválidas');
 
-    // Si el usuario es solo Google y no tiene password, no puede entrar por aquí
     if (user.provider !== AuthProvider.LOCAL || !user.password) {
       throw new UnauthorizedException('Debes iniciar sesión con Google');
     }
@@ -66,14 +63,12 @@ export class AuthService {
     return this.signFor(user);
   }
 
-  /** Login / alta con Google (vía GoogleAuthGuard) */
   async googleLoginOrRegister(googleUser: GoogleUserInput) {
     let user = await this.userRepo.findOne({
       where: { email: googleUser.email },
     });
 
     if (user) {
-      // Si ya existía (LOCAL) pero aún no tenía providerId, lo vinculamos
       if (!user.providerId) {
         user.providerId = googleUser.providerId;
         await this.userRepo.save(user);
@@ -81,7 +76,6 @@ export class AuthService {
       return this.signFor(user);
     }
 
-    // Si no existe, lo creamos como GOOGLE (password null)
     user = this.userRepo.create({
       email: googleUser.email,
       name: googleUser.name,
@@ -95,7 +89,6 @@ export class AuthService {
     return this.signFor(user);
   }
 
-  /** Helper: genera el JWT y devuelve datos útiles */
   private async signFor(user: User) {
     const payload = { sub: user.id, email: user.email, role: user.role };
     const access_token = await this.jwt.signAsync(payload);

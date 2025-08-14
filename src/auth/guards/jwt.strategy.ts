@@ -1,4 +1,3 @@
-// jwt.strategy.ts
 import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
@@ -9,7 +8,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(configService: ConfigService) {
     const secret = configService.get<string>('JWT_SECRET');
 
-    // Validación fuerte para evitar que sea undefined
     if (!secret) {
       throw new Error('JWT_SECRET is not defined in environment variables');
     }
@@ -17,7 +15,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: secret, // ahora TypeScript sabe que es 100% string
+      secretOrKey: secret,
     });
   }
 
