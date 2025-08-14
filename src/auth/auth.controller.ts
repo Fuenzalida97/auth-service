@@ -4,15 +4,7 @@ import { AuthService } from './auth.service';
 import { RegisterUserDto } from './dto/register-user.dto';
 import { LoginUserDto } from './dto/login-user.dto';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
-import { AuthProvider } from '../users/enums/user-authprovider.enum';
-
-type GoogleUserFromGuard = {
-  email: string;
-  name: string;
-  provider: AuthProvider;
-  providerId: string;
-  avatar?: string | null;
-};
+import { GoogleUserFromGuard } from './interfaces/google-user-from-guard.interface';
 
 @Controller('auth')
 export class AuthController {
