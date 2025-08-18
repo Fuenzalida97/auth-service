@@ -6,7 +6,10 @@ import { DatabaseModule } from './database/database.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: process.env.NODE_ENV === 'docker' ? '.env.docker' : '.env',
+    }),
     DatabaseModule,
     AuthModule,
     UsersModule,
